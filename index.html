@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Мой день — трекер дел</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <main class="page">
+    <section class="app-shell">
+      <aside class="phone-card" aria-label="Краткая сводка на день">
+        <div class="flower left" aria-hidden="true">🌷</div>
+        <div class="flower right" aria-hidden="true">🌸</div>
+
+        <div class="header">
+          <p class="eyebrow">личный уютный планер</p>
+          <h1>Мой день</h1>
+          <p class="subtitle">
+            Нежный трекер рабочих и домашних дел, чтобы держать всё под рукой без лишнего шума.
+          </p>
+        </div>
+
+        <div class="quote-card">
+          <p id="dailyQuote" aria-live="polite">Сегодня можно двигаться мягко, но уверенно.</p>
+          <div class="quote-actions">
+            <button class="soft-btn" id="newQuoteBtn" type="button">Другая фраза</button>
+          </div>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat">
+            <span>Всего дел</span>
+            <strong id="totalCount">0</strong>
+          </div>
+          <div class="stat">
+            <span>Готово</span>
+            <strong id="doneCount">0</strong>
+          </div>
+          <div class="stat">
+            <span>Работа</span>
+            <strong id="workCount">0</strong>
+          </div>
+          <div class="stat">
+            <span>Дом</span>
+            <strong id="homeCount">0</strong>
+          </div>
+        </div>
+
+        <div class="progress-wrap">
+          <div class="progress-top">
+            <span>Прогресс дня</span>
+            <span id="progressText">0%</span>
+          </div>
+          <div class="progress" aria-hidden="true">
+            <div class="progress-fill" id="progressFill"></div>
+          </div>
+        </div>
+
+        <div class="section-title">
+          <h2>Ближайшее</h2>
+          <span id="todayDate"></span>
+        </div>
+
+        <div class="mobile-list" id="previewList" aria-live="polite"></div>
+      </aside>
+
+      <section class="main-card">
+        <nav class="tabs" id="tabsNav" aria-label="Основная навигация" role="tablist">
+          <button
+            class="tab-btn active"
+            id="tab-today"
+            data-tab="today"
+            role="tab"
+            type="button"
+            aria-selected="true"
+            aria-controls="todayView"
+          >
+            Сегодня
+          </button>
+          <button
+            class="tab-btn"
+            id="tab-work"
+            data-tab="work"
+            role="tab"
+            type="button"
+            aria-selected="false"
+            aria-controls="workView"
+            tabindex="-1"
+          >
+            Рабочие дела
+          </button>
+          <button
+            class="tab-btn"
+            id="tab-home"
+            data-tab="home"
+            role="tab"
+            type="button"
+            aria-selected="false"
+            aria-controls="homeView"
+            tabindex="-1"
+          >
+            Домашние дела
+          </button>
+          <button
+            class="tab-btn"
+            id="tab-calendar"
+            data-tab="calendar"
+            role="tab"
+            type="button"
+            aria-selected="false"
+            aria-controls="calendarView"
+            tabindex="-1"
+          >
+            Календарь
+          </button>
+          <button
+            class="tab-btn"
+            id="tab-phrases"
+            data-tab="phrases"
+            role="tab"
+            type="button"
+            aria-selected="false"
+            aria-controls="phrasesView"
+            tabindex="-1"
+          >
+            Фразы
+          </button>
+        </nav>
+
+        <form class="form-card" id="taskForm">
+          <input
+            type="text"
+            id="taskInput"
+            placeholder="Добавить новое дело..."
+            autocomplete="off"
+            aria-label="Название задачи"
+            required
+          />
+
+          <select id="taskCategory" aria-label="Категория задачи">
+            <option value="work">Работа</option>
+            <option value="home">Дом</option>
+          </select>
+
+          <input type="date" id="taskDate" aria-label="Дата задачи" required />
+
+          <button class="add-btn" type="submit">Добавить</button>
+        </form>
+
+        <div id="todayView" class="tab-view" role="tabpanel" aria-labelledby="tab-today" aria-hidden="false">
+          <div class="section-title">
+            <h2>Дела на сегодня</h2>
+            <span>то, что важно сейчас</span>
+          </div>
+
+          <div class="note-panel">
+            <label for="todayNoteInput">Заметка на сегодня</label>
+            <textarea
+              id="todayNoteInput"
+              placeholder="Например: важные мысли, настроение, идеи, что не забыть..."
+            ></textarea>
+
+            <div class="panel-actions">
+              <button class="soft-btn" id="saveTodayNoteBtn" type="button">Сохранить заметку</button>
+              <button class="danger-soft-btn" id="clearTodayNoteBtn" type="button">Очистить</button>
+            </div>
+          </div>
+
+          <div class="task-list" id="todayTasks" data-task-list="today"></div>
+        </div>
+
+        <div
+          id="workView"
+          class="tab-view hidden"
+          role="tabpanel"
+          aria-labelledby="tab-work"
+          aria-hidden="true"
+          hidden
+        >
+          <div class="section-title">
+            <h2>Рабочие дела</h2>
+            <span>макеты, правки, созвоны</span>
+          </div>
+          <div class="task-list" id="workTasks" data-task-list="work"></div>
+        </div>
+
+        <div
+          id="homeView"
+          class="tab-view hidden"
+          role="tabpanel"
+          aria-labelledby="tab-home"
+          aria-hidden="true"
+          hidden
+        >
+          <div class="section-title">
+            <h2>Домашние дела</h2>
+            <span>уют, порядок, забота</span>
+          </div>
+          <div class="task-list" id="homeTasks" data-task-list="home"></div>
+        </div>
+
+        <div
+          id="calendarView"
+          class="tab-view hidden"
+          role="tabpanel"
+          aria-labelledby="tab-calendar"
+          aria-hidden="true"
+          hidden
+        >
+          <div class="calendar-head">
+            <div>
+              <h2>Календарь</h2>
+              <span id="calendarSubtitle">план на ближайшие 7 дней</span>
+            </div>
+
+            <div class="calendar-controls" id="calendarControls">
+              <button class="soft-btn" id="prevMonthBtn" type="button" aria-label="Предыдущий период">‹</button>
+              <button
+                class="calendar-mode active"
+                data-calendar-mode="week"
+                type="button"
+                aria-pressed="true"
+              >
+                Неделя
+              </button>
+              <button
+                class="calendar-mode"
+                data-calendar-mode="month"
+                type="button"
+                aria-pressed="false"
+              >
+                Месяц
+              </button>
+              <button class="soft-btn" id="nextMonthBtn" type="button" aria-label="Следующий период">›</button>
+            </div>
+          </div>
+
+          <div id="calendarTitle" class="calendar-title"></div>
+          <div class="calendar-grid week-view" id="calendarGrid" aria-live="polite"></div>
+        </div>
+
+        <div
+          id="phrasesView"
+          class="tab-view hidden"
+          role="tabpanel"
+          aria-labelledby="tab-phrases"
+          aria-hidden="true"
+          hidden
+        >
+          <div class="section-title">
+            <h2>Мотивационные фразы</h2>
+            <span>будут случайно появляться на главном экране</span>
+          </div>
+
+          <div class="phrases-panel">
+            <label for="phraseInput">Добавить свою фразу</label>
+
+            <div class="phrase-form">
+              <input
+                type="text"
+                id="phraseInput"
+                placeholder="Например: я могу двигаться в своём темпе..."
+                autocomplete="off"
+              />
+              <button class="soft-btn" id="addPhraseBtn" type="button">Добавить</button>
+            </div>
+
+            <div class="phrase-list" id="phraseList" aria-live="polite"></div>
+          </div>
+        </div>
+
+        <details class="archive">
+          <summary>Архив выполненных дел</summary>
+          <div class="task-list" id="archiveTasks" data-task-list="archive"></div>
+        </details>
+      </section>
+    </section>
+  </main>
+
+  <div
+    class="day-modal"
+    id="dayModal"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="modalDateTitle"
+    aria-hidden="true"
+  >
+    <div class="day-modal-card">
+      <div class="modal-top">
+        <div>
+          <p id="modalDayLabel">выбранный день</p>
+          <h3 id="modalDateTitle">Дата</h3>
+        </div>
+        <button class="modal-close" id="modalCloseBtn" type="button" aria-label="Закрыть">×</button>
+      </div>
+
+      <div class="modal-summary">
+        <div>
+          <span>Всего</span>
+          <strong id="modalTotal">0</strong>
+        </div>
+        <div>
+          <span>Работа</span>
+          <strong id="modalWork">0</strong>
+        </div>
+        <div>
+          <span>Дом</span>
+          <strong id="modalHome">0</strong>
+        </div>
+      </div>
+
+      <div class="task-list" id="modalTaskList" data-task-list="modal"></div>
+
+      <div class="day-note-box">
+        <label for="modalNoteInput">Заметка на этот день</label>
+        <textarea
+          id="modalNoteInput"
+          placeholder="Например: что важно не забыть, как прошёл день, мысли, идеи..."
+        ></textarea>
+
+        <button class="soft-btn" id="saveDayNoteBtn" type="button">Сохранить заметку</button>
+      </div>
+
+      <div class="modal-actions">
+        <button class="soft-btn" id="addForSelectedDayBtn" type="button">
+          Добавить дело на эту дату
+        </button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
