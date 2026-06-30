@@ -1,0 +1,21 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="10" y1="6" x2="54" y2="58" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFF3F6" />
+      <stop offset="0.52" stop-color="#F2EDFF" />
+      <stop offset="1" stop-color="#E0F1EA" />
+    </linearGradient>
+    <linearGradient id="accent" x1="18" y1="18" x2="47" y2="47" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#DB9FA9" />
+      <stop offset="1" stop-color="#A997E7" />
+    </linearGradient>
+  </defs>
+  <rect x="4" y="4" width="56" height="56" rx="18" fill="url(#bg)" />
+  <rect x="4.75" y="4.75" width="54.5" height="54.5" rx="17.25" stroke="white" stroke-opacity="0.72" stroke-width="1.5" />
+  <rect x="15" y="16" width="34" height="32" rx="11" fill="white" fill-opacity="0.82" />
+  <circle cx="23" cy="27" r="3.25" fill="url(#accent)" />
+  <circle cx="23" cy="38" r="3.25" fill="#DDEFE8" />
+  <rect x="29" y="24.5" width="13" height="4" rx="2" fill="#D8D1F0" />
+  <rect x="29" y="35.5" width="10" height="4" rx="2" fill="#F3CFD3" />
+  <path d="M48 18.5L49.6 21.9L53 23.5L49.6 25.1L48 28.5L46.4 25.1L43 23.5L46.4 21.9L48 18.5Z" fill="#F3CFD3" />
+</svg>

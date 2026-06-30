@@ -42,6 +42,7 @@
   };
 
   const MONTH_WEEKDAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
+  const EMPTY_ARRAY = Object.freeze([]);
 
   const formatters = {
     shortDate: new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "short" }),
@@ -107,7 +108,9 @@
     activeTab: "today",
     calendarMode: "week",
     calendarCursor: new Date(),
-    selectedModalDate: getToday()
+    selectedModalDate: getToday(),
+    lastFocusedElement: null,
+    viewModel: null
   };
 
   init();
@@ -123,6 +126,7 @@
 
   function bindEvents() {
     elements.tabsNav.addEventListener("click", handleTabClick);
+    elements.tabsNav.addEventListener("keydown", handleTabsKeydown);
     elements.taskForm.addEventListener("submit", handleTaskSubmit);
 
     elements.saveTodayNoteBtn.addEventListener("click", () => {
@@ -195,6 +199,47 @@
 
     saveTasks();
     renderApp();
+  }
+
+  function handleTabsKeydown(event) {
+    const currentButton = event.target.closest(".tab-btn");
+
+    if (!currentButton) {
+      return;
+    }
+
+    const currentIndex = elements.tabButtons.indexOf(currentButton);
+
+    if (currentIndex < 0) {
+      return;
+    }
+
+    let nextIndex = null;
+
+    switch (event.key) {
+      case "ArrowRight":
+      case "ArrowDown":
+        nextIndex = (currentIndex + 1) % elements.tabButtons.length;
+        break;
+      case "ArrowLeft":
+      case "ArrowUp":
+        nextIndex = (currentIndex - 1 + elements.tabButtons.length) % elements.tabButtons.length;
+        break;
+      case "Home":
+        nextIndex = 0;
+        break;
+      case "End":
+        nextIndex = elements.tabButtons.length - 1;
+        break;
+      default:
+        return;
+    }
+
+    event.preventDefault();
+    const nextButton = elements.tabButtons[nextIndex];
+    state.activeTab = nextButton.dataset.tab;
+    syncTabState();
+    nextButton.focus();
   }
 
   function handlePhraseInputKeydown(event) {
@@ -421,7 +466,8 @@
 
   function renderApp() {
     const today = getToday();
-    const derived = getDerivedState(today);
+    const derived = buildViewModel(today);
+    state.viewModel = derived;
 
     elements.todayDate.textContent = formatDate(today);
     elements.todayNoteInput.value = state.notes[today] || "";
@@ -432,12 +478,12 @@
     renderTaskList(elements.archiveTasks, derived.completedTasks, EMPTY_STATES.archive);
     renderPreview(derived.todayActive);
     renderStats(derived.todayAll, derived.todayDone);
-    renderCalendar();
+    renderCalendar(derived);
     renderPhrasesList();
     renderQuote();
 
     if (elements.dayModal.classList.contains("is-open")) {
-      renderDayModal(state.selectedModalDate);
+      renderDayModal(state.selectedModalDate, derived);
     }
   }
 
@@ -493,16 +539,16 @@
     elements.phraseList.append(...state.phrases.map(createPhraseItem));
   }
 
-  function renderCalendar() {
+  function renderCalendar(viewModel = state.viewModel ?? buildViewModel(getToday())) {
     if (state.calendarMode === "week") {
-      renderWeekCalendar();
+      renderWeekCalendar(viewModel);
       return;
     }
 
-    renderMonthCalendar();
+    renderMonthCalendar(viewModel);
   }
 
-  function renderWeekCalendar() {
+  function renderWeekCalendar(viewModel) {
     elements.calendarGrid.replaceChildren();
     elements.calendarGrid.className = "calendar-grid week-view";
     elements.calendarSubtitle.textContent = "план на выбранную неделю";
@@ -517,7 +563,7 @@
     for (let index = 0; index < 7; index += 1) {
       const date = addDays(start, index);
       const dateString = toLocalDateString(date);
-      const dayTasks = getActiveTasksByDate(dateString);
+      const dayTasks = viewModel.activeByDate.get(dateString) || EMPTY_ARRAY;
       const isToday = dateString === getToday();
       const hasNote = Boolean(state.notes[dateString]?.trim());
 
@@ -547,7 +593,7 @@
     elements.calendarGrid.append(...dayCards);
   }
 
-  function renderMonthCalendar() {
+  function renderMonthCalendar(viewModel) {
     elements.calendarGrid.replaceChildren();
     elements.calendarGrid.className = "calendar-grid month-view";
     elements.calendarSubtitle.textContent = "план на месяц";
@@ -570,7 +616,7 @@
     for (let index = 0; index < 42; index += 1) {
       const date = addDays(calendarStart, index);
       const dateString = toLocalDateString(date);
-      const dayTasks = getActiveTasksByDate(dateString);
+      const dayTasks = viewModel.activeByDate.get(dateString) || EMPTY_ARRAY;
       const visibleTasks = dayTasks.slice(0, 2);
       const hiddenCount = dayTasks.length - visibleTasks.length;
       const isCurrentMonth = date.getMonth() === month;
@@ -618,18 +664,21 @@
   }
 
   function openDayModal(dateString) {
+    state.lastFocusedElement = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
     state.selectedModalDate = normalizeDateString(dateString);
-    renderDayModal(state.selectedModalDate);
+    renderDayModal(state.selectedModalDate, state.viewModel ?? buildViewModel(getToday()));
     elements.dayModal.classList.add("is-open");
     elements.dayModal.setAttribute("aria-hidden", "false");
+    document.body.classList.add("modal-open");
+    elements.modalCloseBtn.focus();
   }
 
-  function renderDayModal(dateString) {
+  function renderDayModal(dateString, viewModel = state.viewModel ?? buildViewModel(getToday())) {
     const normalizedDate = normalizeDateString(dateString);
-    const dateTasks = state.tasks
-      .filter(task => task.date === normalizedDate)
-      .sort(sortByDate);
-    const activeDateTasks = dateTasks.filter(task => !task.done);
+    const activeDateTasks = viewModel.activeByDate.get(normalizedDate) || EMPTY_ARRAY;
+    const categoryCounts = countTasksByCategory(activeDateTasks);
 
     elements.modalDayLabel.textContent = normalizedDate === getToday()
       ? "сегодня"
@@ -637,8 +686,8 @@
     elements.modalDateTitle.textContent = formatFullDate(parseDateString(normalizedDate));
     elements.modalNoteInput.value = state.notes[normalizedDate] || "";
     elements.modalTotal.textContent = String(activeDateTasks.length);
-    elements.modalWork.textContent = String(activeDateTasks.filter(task => task.category === "work").length);
-    elements.modalHome.textContent = String(activeDateTasks.filter(task => task.category === "home").length);
+    elements.modalWork.textContent = String(categoryCounts.work);
+    elements.modalHome.textContent = String(categoryCounts.home);
 
     renderTaskList(elements.modalTaskList, activeDateTasks, EMPTY_STATES.modal);
   }
@@ -646,6 +695,12 @@
   function closeDayModal() {
     elements.dayModal.classList.remove("is-open");
     elements.dayModal.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("modal-open");
+
+    if (state.lastFocusedElement) {
+      state.lastFocusedElement.focus();
+      state.lastFocusedElement = null;
+    }
   }
 
   function syncTabState() {
@@ -675,14 +730,18 @@
     });
   }
 
-  function getDerivedState(today) {
+  function buildViewModel(today) {
     const activeTasks = state.tasks.filter(task => !task.done).sort(sortByDate);
     const completedTasks = state.tasks.filter(task => task.done).sort(sortByDate);
     const todayAll = state.tasks.filter(task => task.date === today).sort(sortByDate);
     const todayDone = todayAll.filter(task => task.done);
+    const activeByDate = groupTasksByDate(activeTasks);
+    const allByDate = groupTasksByDate([...activeTasks, ...completedTasks].sort(sortByDate));
 
     return {
       activeTasks,
+      activeByDate,
+      allByDate,
       completedTasks,
       todayAll,
       todayDone,
@@ -690,12 +749,6 @@
       workActive: activeTasks.filter(task => task.category === "work"),
       homeActive: activeTasks.filter(task => task.category === "home")
     };
-  }
-
-  function getActiveTasksByDate(dateString) {
-    return state.tasks
-      .filter(task => task.date === dateString && !task.done)
-      .sort(sortByDate);
   }
 
   function createTaskElement(task) {
@@ -858,6 +911,30 @@
 
   function findTask(taskId) {
     return state.tasks.find(task => task.id === taskId) || null;
+  }
+
+  function groupTasksByDate(tasks) {
+    const map = new Map();
+
+    tasks.forEach(task => {
+      const list = map.get(task.date);
+
+      if (list) {
+        list.push(task);
+        return;
+      }
+
+      map.set(task.date, [task]);
+    });
+
+    return map;
+  }
+
+  function countTasksByCategory(tasks) {
+    return tasks.reduce((counts, task) => {
+      counts[task.category] += 1;
+      return counts;
+    }, { work: 0, home: 0 });
   }
 
   function saveTasks() {
