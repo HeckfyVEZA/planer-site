@@ -97,7 +97,13 @@
     modalHome: getElement("modalHome"),
     modalNoteInput: getElement("modalNoteInput"),
     saveDayNoteBtn: getElement("saveDayNoteBtn"),
-    addForSelectedDayBtn: getElement("addForSelectedDayBtn")
+    addForSelectedDayBtn: getElement("addForSelectedDayBtn"),
+    datePickerModal: getElement("datePickerModal"),
+    datePickerCloseBtn: getElement("datePickerCloseBtn"),
+    datePickerTaskTitle: getElement("datePickerTaskTitle"),
+    taskDatePickerInput: getElement("taskDatePickerInput"),
+    cancelDatePickerBtn: getElement("cancelDatePickerBtn"),
+    saveDatePickerBtn: getElement("saveDatePickerBtn")
   };
 
   const state = {
@@ -109,7 +115,9 @@
     calendarMode: "week",
     calendarCursor: new Date(),
     selectedModalDate: getToday(),
-    lastFocusedElement: null,
+    dayModalReturnFocus: null,
+    datePickerReturnFocus: null,
+    editingDateTaskId: null,
     viewModel: null
   };
 
@@ -160,6 +168,11 @@
       saveNote(state.selectedModalDate, elements.modalNoteInput.value);
     });
     elements.addForSelectedDayBtn.addEventListener("click", moveFocusToTaskForm);
+    elements.datePickerCloseBtn.addEventListener("click", closeDatePicker);
+    elements.cancelDatePickerBtn.addEventListener("click", closeDatePicker);
+    elements.saveDatePickerBtn.addEventListener("click", submitDatePicker);
+    elements.datePickerModal.addEventListener("click", handleDatePickerBackdropClick);
+    elements.taskDatePickerInput.addEventListener("keydown", handleDatePickerInputKeydown);
 
     document.addEventListener("keydown", handleDocumentKeydown);
   }
@@ -336,6 +349,9 @@
       case "edit":
         editTask(taskId);
         break;
+      case "change-date":
+        changeTaskDate(taskId);
+        break;
       case "delete":
         deleteTask(taskId);
         break;
@@ -350,10 +366,30 @@
     }
   }
 
+  function handleDatePickerBackdropClick(event) {
+    if (event.target === elements.datePickerModal) {
+      closeDatePicker();
+    }
+  }
+
   function handleDocumentKeydown(event) {
+    if (event.key === "Escape" && elements.datePickerModal.classList.contains("is-open")) {
+      closeDatePicker();
+      return;
+    }
+
     if (event.key === "Escape") {
       closeDayModal();
     }
+  }
+
+  function handleDatePickerInputKeydown(event) {
+    if (event.key !== "Enter") {
+      return;
+    }
+
+    event.preventDefault();
+    submitDatePicker();
   }
 
   function shiftCalendar(direction) {
@@ -436,6 +472,16 @@
     task.title = normalizedTitle;
     saveTasks();
     renderApp();
+  }
+
+  function changeTaskDate(taskId) {
+    const task = findTask(taskId);
+
+    if (!task) {
+      return;
+    }
+
+    openDatePicker(task);
   }
 
   function deleteTask(taskId) {
@@ -664,14 +710,14 @@
   }
 
   function openDayModal(dateString) {
-    state.lastFocusedElement = document.activeElement instanceof HTMLElement
+    state.dayModalReturnFocus = document.activeElement instanceof HTMLElement
       ? document.activeElement
       : null;
     state.selectedModalDate = normalizeDateString(dateString);
     renderDayModal(state.selectedModalDate, state.viewModel ?? buildViewModel(getToday()));
     elements.dayModal.classList.add("is-open");
     elements.dayModal.setAttribute("aria-hidden", "false");
-    document.body.classList.add("modal-open");
+    syncBodyModalState();
     elements.modalCloseBtn.focus();
   }
 
@@ -692,14 +738,84 @@
     renderTaskList(elements.modalTaskList, activeDateTasks, EMPTY_STATES.modal);
   }
 
+  function openDatePicker(task) {
+    state.editingDateTaskId = task.id;
+    state.datePickerReturnFocus = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
+
+    elements.datePickerTaskTitle.textContent = task.title;
+    elements.taskDatePickerInput.value = task.date;
+    elements.datePickerModal.classList.add("is-open");
+    elements.datePickerModal.setAttribute("aria-hidden", "false");
+    syncBodyModalState();
+
+    requestAnimationFrame(() => {
+      elements.taskDatePickerInput.focus();
+
+      if (typeof elements.taskDatePickerInput.showPicker === "function") {
+        try {
+          elements.taskDatePickerInput.showPicker();
+        } catch {
+          // Ignore browsers that block programmatic picker open.
+        }
+      }
+    });
+  }
+
+  function closeDatePicker(options = {}) {
+    const { restoreFocus = true } = options;
+
+    elements.datePickerModal.classList.remove("is-open");
+    elements.datePickerModal.setAttribute("aria-hidden", "true");
+    state.editingDateTaskId = null;
+    syncBodyModalState();
+
+    if (restoreFocus && state.datePickerReturnFocus) {
+      state.datePickerReturnFocus.focus();
+    }
+
+    state.datePickerReturnFocus = null;
+  }
+
+  function submitDatePicker() {
+    if (!state.editingDateTaskId) {
+      closeDatePicker();
+      return;
+    }
+
+    const task = findTask(state.editingDateTaskId);
+
+    if (!task) {
+      closeDatePicker();
+      return;
+    }
+
+    const nextDate = elements.taskDatePickerInput.value.trim();
+
+    if (!isValidDateString(nextDate)) {
+      alert("Выбери корректную дату.");
+      elements.taskDatePickerInput.focus();
+      return;
+    }
+
+    task.date = nextDate;
+    const taskId = task.id;
+
+    closeDatePicker({ restoreFocus: false });
+    saveTasks();
+    renderApp();
+    focusTaskAction(taskId, "change-date");
+  }
+
   function closeDayModal() {
     elements.dayModal.classList.remove("is-open");
     elements.dayModal.setAttribute("aria-hidden", "true");
-    document.body.classList.remove("modal-open");
+    syncBodyModalState();
 
-    if (state.lastFocusedElement) {
-      state.lastFocusedElement.focus();
-      state.lastFocusedElement = null;
+    if (state.dayModalReturnFocus) {
+      state.dayModalReturnFocus.focus();
+      state.dayModalReturnFocus = null;
     }
   }
 
@@ -728,6 +844,13 @@
       button.classList.toggle("active", isActive);
       button.setAttribute("aria-pressed", String(isActive));
     });
+  }
+
+  function syncBodyModalState() {
+    const hasOpenModal = elements.dayModal.classList.contains("is-open")
+      || elements.datePickerModal.classList.contains("is-open");
+
+    document.body.classList.toggle("modal-open", hasOpenModal);
   }
 
   function buildViewModel(today) {
@@ -795,6 +918,16 @@
           "aria-label": `Редактировать задачу: ${task.title}`
         },
         dataset: { action: "edit" }
+      }),
+      createElement("button", {
+        className: "icon-btn",
+        text: "🗓",
+        attrs: {
+          type: "button",
+          title: "Изменить дату",
+          "aria-label": `Изменить дату задачи: ${task.title}`
+        },
+        dataset: { action: "change-date" }
       }),
       createElement("button", {
         className: "icon-btn",
@@ -911,6 +1044,15 @@
 
   function findTask(taskId) {
     return state.tasks.find(task => task.id === taskId) || null;
+  }
+
+  function focusTaskAction(taskId, action) {
+    const button = Array.from(document.querySelectorAll(`[data-task-id] [data-action="${action}"]`))
+      .find(item => item.closest("[data-task-id]")?.dataset.taskId === taskId);
+
+    if (button instanceof HTMLElement) {
+      button.focus();
+    }
   }
 
   function groupTasksByDate(tasks) {

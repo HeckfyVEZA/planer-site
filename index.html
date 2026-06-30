@@ -336,5 +336,33 @@
       </div>
     </div>
   </div>
+
+  <div
+    class="day-modal date-picker-modal"
+    id="datePickerModal"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="datePickerTitle"
+    aria-hidden="true"
+  >
+    <div class="day-modal-card date-picker-card">
+      <div class="date-picker-head">
+        <div>
+          <p class="date-picker-eyebrow">перенос задачи</p>
+          <h3 id="datePickerTitle">Изменить дату</h3>
+          <p class="date-picker-task" id="datePickerTaskTitle"></p>
+        </div>
+        <button class="modal-close" id="datePickerCloseBtn" type="button" aria-label="Закрыть">×</button>
+      </div>
+
+      <label class="date-picker-label" for="taskDatePickerInput">Новая дата</label>
+      <input type="date" id="taskDatePickerInput" />
+
+      <div class="modal-actions">
+        <button class="soft-btn" id="cancelDatePickerBtn" type="button">Отмена</button>
+        <button class="add-btn" id="saveDatePickerBtn" type="button">Сохранить дату</button>
+      </div>
+    </div>
+  </div>
 </body>
 </html>
