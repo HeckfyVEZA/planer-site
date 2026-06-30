@@ -950,6 +950,10 @@ textarea:focus-visible,
   font-weight: 700;
 }
 
+.date-picker-title-field {
+  margin-bottom: 14px;
+}
+
 .date-picker-card input[type="date"] {
   margin-bottom: 8px;
 }

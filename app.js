@@ -100,7 +100,11 @@
     addForSelectedDayBtn: getElement("addForSelectedDayBtn"),
     datePickerModal: getElement("datePickerModal"),
     datePickerCloseBtn: getElement("datePickerCloseBtn"),
+    datePickerEyebrow: getElement("datePickerEyebrow"),
+    datePickerTitle: getElement("datePickerTitle"),
     datePickerTaskTitle: getElement("datePickerTaskTitle"),
+    datePickerTitleField: getElement("datePickerTitleField"),
+    taskTitlePickerInput: getElement("taskTitlePickerInput"),
     taskDatePickerInput: getElement("taskDatePickerInput"),
     cancelDatePickerBtn: getElement("cancelDatePickerBtn"),
     saveDatePickerBtn: getElement("saveDatePickerBtn")
@@ -118,6 +122,7 @@
     dayModalReturnFocus: null,
     datePickerReturnFocus: null,
     editingDateTaskId: null,
+    editingTaskMode: "date",
     viewModel: null
   };
 
@@ -349,9 +354,6 @@
       case "edit":
         editTask(taskId);
         break;
-      case "change-date":
-        changeTaskDate(taskId);
-        break;
       case "delete":
         deleteTask(taskId);
         break;
@@ -457,31 +459,7 @@
       return;
     }
 
-    const updatedTitle = prompt("Изменить дело:", task.title);
-
-    if (updatedTitle === null) {
-      return;
-    }
-
-    const normalizedTitle = updatedTitle.trim();
-
-    if (!normalizedTitle) {
-      return;
-    }
-
-    task.title = normalizedTitle;
-    saveTasks();
-    renderApp();
-  }
-
-  function changeTaskDate(taskId) {
-    const task = findTask(taskId);
-
-    if (!task) {
-      return;
-    }
-
-    openDatePicker(task);
+    openDatePicker(task, { mode: "full" });
   }
 
   function deleteTask(taskId) {
@@ -738,19 +716,36 @@
     renderTaskList(elements.modalTaskList, activeDateTasks, EMPTY_STATES.modal);
   }
 
-  function openDatePicker(task) {
+  function openDatePicker(task, options = {}) {
+    const { mode = "date" } = options;
+
     state.editingDateTaskId = task.id;
+    state.editingTaskMode = mode;
     state.datePickerReturnFocus = document.activeElement instanceof HTMLElement
       ? document.activeElement
       : null;
 
+    const isFullMode = mode === "full";
+
+    elements.datePickerEyebrow.textContent = isFullMode ? "редактирование задачи" : "перенос задачи";
+    elements.datePickerTitle.textContent = isFullMode ? "Изменить задачу" : "Изменить дату";
     elements.datePickerTaskTitle.textContent = task.title;
+    elements.datePickerTitleField.classList.toggle("hidden", !isFullMode);
+    elements.datePickerTitleField.hidden = !isFullMode;
+    elements.taskTitlePickerInput.value = task.title;
     elements.taskDatePickerInput.value = task.date;
+    elements.saveDatePickerBtn.textContent = isFullMode ? "Сохранить изменения" : "Сохранить дату";
     elements.datePickerModal.classList.add("is-open");
     elements.datePickerModal.setAttribute("aria-hidden", "false");
     syncBodyModalState();
 
     requestAnimationFrame(() => {
+      if (isFullMode) {
+        elements.taskTitlePickerInput.focus();
+        elements.taskTitlePickerInput.select();
+        return;
+      }
+
       elements.taskDatePickerInput.focus();
 
       if (typeof elements.taskDatePickerInput.showPicker === "function") {
@@ -769,6 +764,7 @@
     elements.datePickerModal.classList.remove("is-open");
     elements.datePickerModal.setAttribute("aria-hidden", "true");
     state.editingDateTaskId = null;
+    state.editingTaskMode = "date";
     syncBodyModalState();
 
     if (restoreFocus && state.datePickerReturnFocus) {
@@ -799,13 +795,25 @@
       return;
     }
 
+    if (state.editingTaskMode === "full") {
+      const nextTitle = elements.taskTitlePickerInput.value.trim();
+
+      if (!nextTitle) {
+        alert("Название задачи не должно быть пустым.");
+        elements.taskTitlePickerInput.focus();
+        return;
+      }
+
+      task.title = nextTitle;
+    }
+
     task.date = nextDate;
     const taskId = task.id;
 
     closeDatePicker({ restoreFocus: false });
     saveTasks();
     renderApp();
-    focusTaskAction(taskId, "change-date");
+    focusTaskAction(taskId, "edit");
   }
 
   function closeDayModal() {
@@ -918,16 +926,6 @@
           "aria-label": `Редактировать задачу: ${task.title}`
         },
         dataset: { action: "edit" }
-      }),
-      createElement("button", {
-        className: "icon-btn",
-        text: "🗓",
-        attrs: {
-          type: "button",
-          title: "Изменить дату",
-          "aria-label": `Изменить дату задачи: ${task.title}`
-        },
-        dataset: { action: "change-date" }
       }),
       createElement("button", {
         className: "icon-btn",
